@@ -1,0 +1,17 @@
+{
+  "name": "jjal-tok",
+  "version": "1.0.0",
+  "description": "GIF 이미지를 임시 저장소에 다운로드하여 카카오톡으로 빠르게 전송하는 Chrome 확장 프로그램",
+  "main": "src/background.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "chrome-extension",
+    "gif",
+    "kakaotalk",
+    "downloader"
+  ],
+  "author": "kabkee",
+  "license": "MIT"
+}
