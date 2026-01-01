@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>짤톡</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>💬 짤톡</h1>
+      <p class="subtitle">GIF를 다운로드 폴더에 저장합니다</p>
+    </header>
+    
+    <div class="instructions">
+      <p>📌 사용법:</p>
+      <ol>
+        <li>웹페이지에서 GIF를 더블클릭하거나 우클릭 → "짤톡에 저장"</li>
+        <li>다운로드 폴더에서 GIF 파일 확인</li>
+        <li>파일을 카카오톡 채팅창으로 드래그하여 전송!</li>
+      </ol>
+      <button id="openFolderBtn" class="folder-btn">📁 다운로드 폴더 열기</button>
+    </div>
+    
+    <div id="gifList" class="gif-list">
+      <div class="empty-state">
+        <p>저장된 GIF가 없습니다</p>
+        <p class="hint">웹페이지에서 GIF를 더블클릭하여 저장하세요</p>
+      </div>
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
