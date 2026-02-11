@@ -1,0 +1,141 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## 프로젝트 개요
+
+**짤톡 (JjalTok)** - Firefox/Zen 브라우저용 GIF 다운로더 확장 프로그램
+
+GIF 이미지를 더블클릭하여 `다운로드/jjal-tok/` 폴더에 자동 저장하고, 카카오톡으로 빠르게 전송할 수 있게 해주는 브라우저 확장 프로그램입니다.
+
+## 개발 환경 설정
+
+### 확장 프로그램 설치 및 테스트
+
+```bash
+# 1. Firefox/Zen 브라우저에서 about:debugging 열기
+# 2. "This Firefox" (이 Firefox) 클릭
+# 3. "Load Temporary Add-on" (임시 애드온 로드) 클릭
+# 4. manifest.json 파일 선택
+```
+
+### 개발 시 주의사항
+
+- **빌드 프로세스 없음**: 이 프로젝트는 Vanilla JavaScript로 작성되어 별도의 빌드 도구가 필요하지 않습니다
+- **확장 프로그램 재로드**: 코드 변경 후 `about:debugging`에서 "Reload" 버튼 클릭
+- **페이지 새로고침**: content.js 변경 시 테스트 중인 웹페이지도 새로고침 필요
+- **디버깅**:
+  - background.js: about:debugging → Inspect 클릭
+  - popup: 팝업 우클릭 → Inspect
+  - content.js: 웹페이지 개발자 도구
+
+## 코드 아키텍처
+
+### 3-Layer 구조
+
+```
+┌─────────────────────────────────────────────────────┐
+│  popup/ (UI Layer)                                  │
+│  - 저장된 GIF 목록 표시                             │
+│  - 다운로드 폴더 열기                               │
+│  - GIF 삭제 관리                                    │
+└─────────────────────────────────────────────────────┘
+                        ↕ (chrome.runtime.sendMessage)
+┌─────────────────────────────────────────────────────┐
+│  src/background.js (Service Worker / Controller)   │
+│  - Chrome Downloads API로 실제 파일 다운로드        │
+│  - Storage API로 다운로드 이력 관리 (최대 20개)    │
+│  - Context Menus 관리 ("짤톡에 저장")              │
+│  - Notifications 발송                               │
+└─────────────────────────────────────────────────────┘
+                        ↕ (chrome.runtime.sendMessage)
+┌─────────────────────────────────────────────────────┐
+│  src/content.js (Web Page Integration)              │
+│  - GIF 이미지 더블클릭 감지                         │
+│  - 드래그 시작 감지                                 │
+│  - 우클릭 메뉴 (context menu) 감지                 │
+│  - 페이지 내 알림 표시                              │
+└─────────────────────────────────────────────────────┘
+```
+
+### 주요 데이터 흐름
+
+1. **GIF 다운로드 플로우**:
+   - content.js: 사용자 이벤트 감지 (더블클릭/우클릭) → `downloadGif` 메시지 전송
+   - background.js: 메시지 수신 → `chrome.downloads.download()` 호출
+   - background.js: 다운로드 ID 생성 → Storage에 GIF 정보 저장
+   - background.js: `chrome.downloads.onChanged` 리스너로 상태 업데이트 (downloading → complete/failed)
+
+2. **Storage 구조**:
+   ```javascript
+   downloadedGifs = [
+     {
+       id: downloadId,           // 고유 ID (다운로드 ID와 동일)
+       url: "https://...",        // 원본 GIF URL
+       filename: "example.gif",   // 파일명
+       timestamp: "2024-...",     // 다운로드 시각
+       downloadId: 123,           // Chrome Downloads API ID
+       status: "complete"         // downloading/complete/failed
+     }
+   ]
+   ```
+
+3. **최대 20개 제한**:
+   - 새 GIF가 추가될 때 `downloadedGifs.unshift()`로 맨 앞에 추가
+   - 20개 초과 시 `slice(0, 20)`으로 오래된 항목 자동 제거
+
+### Chrome Extension API 사용
+
+- `chrome.downloads`: 파일 다운로드, 폴더 열기, 파일 위치 표시
+- `chrome.storage.local`: 다운로드 이력 영구 저장
+- `chrome.contextMenus`: 우클릭 메뉴 ("짤톡에 저장")
+- `chrome.notifications`: 다운로드 시작 알림
+- `chrome.runtime.sendMessage`: 레이어 간 통신
+
+### Firefox vs Chrome 차이점
+
+```javascript
+// Chrome: 실제 파일 삭제 지원
+if (chrome.downloads.removeFile) {
+  chrome.downloads.removeFile(downloadId, callback);
+} else {
+  // Firefox/Zen: 파일 삭제 미지원 → 이력만 삭제
+  console.log('이 브라우저는 파일 삭제를 지원하지 않습니다.');
+}
+```
+
+## 파일별 역할
+
+- `manifest.json`: 확장 프로그램 설정 (permissions, background, content_scripts, browser_specific_settings)
+- `src/background.js`: 다운로드 관리자 역할 (Service Worker)
+- `src/content.js`: 웹페이지에 주입되어 사용자 이벤트 감지
+- `popup/popup.html`: 확장 프로그램 팝업 UI
+- `popup/popup.js`: 팝업 로직 (GIF 목록 렌더링, 삭제, 폴더 열기)
+- `popup/popup.css`: 팝업 스타일
+- `icons/`: 확장 프로그램 아이콘 (16x16, 48x48, 128x128)
+
+## 개발 시 고려사항
+
+### GIF 감지 로직
+```javascript
+// content.js에서 GIF URL 감지
+function isGifUrl(url) {
+  return url && (url.toLowerCase().endsWith('.gif') || url.includes('.gif?'));
+}
+```
+- `.gif?` 패턴도 지원 (쿼리 파라미터가 있는 GIF URL)
+
+### 확장 프로그램 재로드 후 에러 처리
+- content.js가 주입된 페이지에서 확장 프로그램을 재로드하면 `chrome.runtime.id`가 무효화됨
+- 에러 캐치 후 사용자에게 "페이지를 새로고침하세요" 안내
+
+### 다운로드 폴더 구조
+- 모든 GIF는 `다운로드/jjal-tok/` 서브폴더에 저장
+- 파일명 충돌 시 `conflictAction: 'uniquify'`로 자동 번호 추가
+
+## 기술 스택
+
+- Manifest V3 (Firefox/Zen Browser)
+- Vanilla JavaScript (ES6+)
+- Chrome Extension APIs (Downloads, Storage, Context Menus, Notifications)
+- No build tools, no dependencies

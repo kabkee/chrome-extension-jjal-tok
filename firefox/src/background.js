@@ -1,12 +1,31 @@
 let downloadedGifs = [];
+let storageInitialized = false;
+
+// Storage 초기화 함수
+function initializeStorage() {
+  chrome.storage.local.get(['downloadedGifs'], (result) => {
+    if (result.downloadedGifs) {
+      downloadedGifs = result.downloadedGifs;
+    }
+    storageInitialized = true;
+    console.log('Storage 초기화 완료:', downloadedGifs.length, '개 GIF');
+  });
+}
 
 chrome.runtime.onInstalled.addListener(() => {
+  // Storage 초기화
+  initializeStorage();
+
+  // Context menu 생성
   chrome.contextMenus.create({
     id: 'saveGifToJjalTok',
     title: '짤톡에 저장',
     contexts: ['image']
   });
 });
+
+// Service Worker 시작 시에도 초기화 실행
+initializeStorage();
 
 chrome.downloads.onChanged.addListener((delta) => {
   if (delta.state && delta.state.current === 'complete') {
@@ -38,7 +57,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     downloadGif(request.url);
     sendResponse({ success: true });
   } else if (request.action === 'getDownloadedGifs') {
-    sendResponse({ gifs: downloadedGifs });
+    // Storage 초기화가 완료되지 않았으면 기다렸다가 반환
+    if (!storageInitialized) {
+      chrome.storage.local.get(['downloadedGifs'], (result) => {
+        const gifs = result.downloadedGifs || [];
+        sendResponse({ gifs: gifs });
+      });
+      return true;  // 비동기 응답을 위해 true 반환
+    } else {
+      sendResponse({ gifs: downloadedGifs });
+    }
   } else if (request.action === 'clearGif') {
     const gif = downloadedGifs.find(g => g.id === request.id);
     
@@ -148,9 +176,3 @@ function extractFilename(url) {
   const filename = pathname.split('/').pop();
   return filename || `gif_${Date.now()}.gif`;
 }
-
-chrome.storage.local.get(['downloadedGifs'], (result) => {
-  if (result.downloadedGifs) {
-    downloadedGifs = result.downloadedGifs;
-  }
-});
