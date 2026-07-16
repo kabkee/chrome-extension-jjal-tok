@@ -1,20 +1,47 @@
 let draggedImageUrl = null;
 
+// storage_jjal의 그리드는 썸네일(항상 .webp)을 <img src>로 표시하므로,
+// src만 보면 GIF 원본을 더 이상 찾을 수 없다. 카드 컨테이너에 심어둔
+// data-file 속성(원본 경로)이 있으면 그걸 우선 쓰고, 없는 사이트는
+// 기존처럼 src를 그대로 쓴다.
+function resolveImageUrl(imgEl) {
+  const container = imgEl.closest('[data-file]');
+  if (container) {
+    return new URL(container.dataset.file, location.href).href;
+  }
+  return imgEl.src;
+}
+
 document.addEventListener('contextmenu', (e) => {
   if (e.target.tagName === 'IMG') {
-    const imgUrl = e.target.src;
+    const imgUrl = resolveImageUrl(e.target);
     if (isGifUrl(imgUrl)) {
       draggedImageUrl = imgUrl;
+
+      // 브라우저 컨텍스트 메뉴는 클릭 시점의 <img src>(=썸네일)를
+      // info.srcUrl로 넘기므로, 우클릭한 시점에 우리가 계산한 원본
+      // GIF URL을 백그라운드에 미리 알려준다. 컨텍스트 메뉴의
+      // '짤톡에 저장' 클릭 핸들러가 이 값을 info.srcUrl보다 우선 사용한다.
+      try {
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id) {
+          chrome.runtime.sendMessage({
+            action: 'setContextImageUrl',
+            url: imgUrl
+          });
+        }
+      } catch (error) {
+        console.error('컨텍스트 메뉴 URL 전달 오류:', error);
+      }
     }
   }
 }, true);
 
 document.addEventListener('dragstart', (e) => {
   if (e.target.tagName === 'IMG') {
-    const imgUrl = e.target.src;
+    const imgUrl = resolveImageUrl(e.target);
     if (isGifUrl(imgUrl)) {
       draggedImageUrl = imgUrl;
-      
+
       try {
         if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id) {
           chrome.runtime.sendMessage({
@@ -32,7 +59,7 @@ document.addEventListener('dragstart', (e) => {
 document.addEventListener('dblclick', (e) => {
   console.log('더블클릭 이벤트 발생:', e.target.tagName);
   if (e.target.tagName === 'IMG') {
-    const imgUrl = e.target.src;
+    const imgUrl = resolveImageUrl(e.target);
     console.log('이미지 URL:', imgUrl);
     console.log('GIF 여부:', isGifUrl(imgUrl));
     if (isGifUrl(imgUrl)) {

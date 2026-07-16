@@ -1,4 +1,7 @@
 let downloadedGifs = [];
+// content.js가 우클릭 시점에 계산해서 보내주는 "실제 원본" GIF URL.
+// storage_jjal처럼 <img src>가 썸네일(webp)인 사이트에서 info.srcUrl 대신 쓴다.
+let lastContextImageUrl = null;
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
@@ -28,13 +31,19 @@ chrome.downloads.onChanged.addListener((delta) => {
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'saveGifToJjalTok') {
-    const imageUrl = info.srcUrl;
+    // content.js가 우클릭 직전에 알려준 원본 GIF URL이 있으면 그걸 쓰고,
+    // 없으면(다른 사이트 등) 브라우저가 넘겨준 info.srcUrl로 폴백한다.
+    const imageUrl = lastContextImageUrl || info.srcUrl;
+    lastContextImageUrl = null;
     downloadGif(imageUrl);
   }
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'downloadGif') {
+  if (request.action === 'setContextImageUrl') {
+    lastContextImageUrl = request.url;
+    sendResponse({ success: true });
+  } else if (request.action === 'downloadGif') {
     downloadGif(request.url);
     sendResponse({ success: true });
   } else if (request.action === 'getDownloadedGifs') {
