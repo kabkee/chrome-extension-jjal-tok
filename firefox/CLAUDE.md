@@ -147,6 +147,16 @@ function isGifUrl(url) {
 - 모든 GIF는 `다운로드/jjal-tok/` 서브폴더에 저장
 - 파일명 충돌 시 `conflictAction: 'uniquify'`로 자동 번호 추가
 
+## 배포 (GitHub Release)
+
+- `npm run build` / `npm run lint` (firefox/에서): 개발용 파일·native-host 제외하고 xpi 빌드
+- `npm run sign`: Mozilla **비공개(unlisted)** 서명 — 스토어에 등록·노출되지 않고 서명된 xpi만 받는다.
+  `WEB_EXT_API_KEY`(JWT issuer) / `WEB_EXT_API_SECRET`(JWT secret) 환경 변수 필요 (AMO 개발자 API 키).
+  같은 버전은 두 번 서명할 수 없으므로 manifest version을 먼저 올린다.
+- 서명 결과(`web-ext-artifacts/<해시>-<버전>.xpi`)를 `jjaltok-<버전>.xpi`로 이름 바꿔 커밋하고 릴리스에 첨부
+- Chrome은 `chrome/` 폴더를 zip으로 첨부 (개발자 모드 "압축해제된 확장 프로그램 로드"로 설치)
+- macOS 도우미는 미리 빌드해 배포하지 않는다 (공증 없는 앱은 Gatekeeper가 막음) → 소스의 `install.sh`로 각자 빌드
+
 ## 기술 스택
 
 - Manifest V3 (Firefox/Zen Browser)
