@@ -1,5 +1,13 @@
 let draggedImageUrl = null;
 
+// 짤 사이트(storage_jjal)가 "짤톡 설치됨"을 알 수 있게 페이지에 표시한다.
+// 사이트는 이 값이 있으면 GIF 클릭 시 'Save As로 받으세요' 안내를 생략한다 (더블클릭으로 바로 저장되므로).
+try {
+  document.documentElement.dataset.jjaltok = chrome.runtime.getManifest().version;
+} catch (error) {
+  // 확장 재로드 직후 등 컨텍스트가 없으면 표시하지 않음
+}
+
 // storage_jjal의 그리드는 썸네일(항상 .webp)을 <img src>로 표시하므로,
 // src만 보면 GIF 원본을 더 이상 찾을 수 없다. 카드 컨테이너에 심어둔
 // data-file 속성(원본 경로)이 있으면 그걸 우선 쓰고, 없는 사이트는

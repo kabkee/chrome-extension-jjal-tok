@@ -8,7 +8,8 @@
 //   Zen의 권한을 물려받지 못하고 자기 이름으로 검사받는다. python 스크립트면 python3 자체에
 //   권한을 줘야 하므로, 짤톡 전용 앱으로 만들어 이 앱에만 '다운로드 폴더' 권한을 받는다.
 //
-// - jjal-tok 폴더 바로 아래 파일만 다룬다. (다른 경로는 null/거부)
+// - ~/Downloads/jjal-tok 폴더 바로 아래 파일만 다룬다. (심볼릭 링크를 풀어 실제 경로로 비교, 다른 경로는 null/거부)
+//   ※ 이름만 jjal-tok인 다른 폴더(예: 이 프로젝트 폴더)는 대상이 아니다.
 // - 파일을 새로 만들지 않는다.
 //
 // 프로토콜: stdin/stdout, 4바이트 길이(native byte order) + UTF-8 JSON
@@ -20,14 +21,14 @@
 //   {"action": "openFolder", "path": ... }      → {"ok": true|false}
 //   {"action": "sourceUrl", "paths": [...]}     → {"ok": true, "results": {경로: "https://..."|null}}
 //      (macOS가 다운로드 파일에 기록해 둔 출처 kMDItemWhereFroms)
-//   폴더 path가 없거나 jjal-tok 폴더가 아니면 ~/Downloads/jjal-tok 을 쓴다.
+//   폴더는 항상 ~/Downloads/jjal-tok (요청의 path는 무시)
 //   macOS 권한 문제면 {"ok": false, "error": "permission"}
 //
 // 설치 스크립트는 `--request-access`로 한 번 실행해 macOS 권한 요청 창을 미리 띄운다.
 
 import Foundation
 
-let version = 5
+let version = 6
 let folderName = "jjal-tok"
 let home = ProcessInfo.processInfo.environment["HOME"] ?? NSHomeDirectory()
 let logPath = home + "/Library/Logs/JjalTok/host.log"
@@ -68,18 +69,26 @@ func isPermissionError(_ error: Error) -> Bool {
     return ns.domain == NSPOSIXErrorDomain && (ns.code == Int(EPERM) || ns.code == Int(EACCES))
 }
 
-func isJjalTokFile(_ path: Any?) -> Bool {
-    guard let path = path as? String, path.hasPrefix("/") else { return false }
-    let parent = ((path as NSString).standardizingPath as NSString).deletingLastPathComponent
-    return (parent as NSString).lastPathComponent == folderName
+let jjalTokFolder = home + "/Downloads/" + folderName
+
+func realPath(_ path: String) -> String {
+    URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
 }
 
+// ~/Downloads/jjal-tok 바로 아래 파일인지 (. / .. 경로, 숨김 파일, 다른 폴더는 거부)
+func isJjalTokFile(_ path: Any?) -> Bool {
+    guard let path = path as? String, path.hasPrefix("/") else { return false }
+    let components = path.split(separator: "/", omittingEmptySubsequences: false)
+    if components.contains(where: { $0 == "." || $0 == ".." }) { return false }
+    let name = (path as NSString).lastPathComponent
+    if name.isEmpty || name.hasPrefix(".") { return false }
+    let parent = (path as NSString).deletingLastPathComponent
+    return realPath(parent) == realPath(jjalTokFolder)
+}
+
+// 폴더는 항상 ~/Downloads/jjal-tok (요청으로 다른 폴더를 지정할 수 없게)
 func resolveFolder(_ path: Any?) -> String {
-    if let path = path as? String, path.hasPrefix("/"),
-       ((path as NSString).standardizingPath as NSString).lastPathComponent == folderName {
-        return path
-    }
-    return home + "/Downloads/" + folderName
+    return jjalTokFolder
 }
 
 func isFile(_ path: String) -> Bool {

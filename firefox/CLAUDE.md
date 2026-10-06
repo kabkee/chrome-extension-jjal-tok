@@ -113,10 +113,24 @@ GIF 이미지를 더블클릭하여 `다운로드/jjal-tok/` 폴더에 자동 �
 - `chrome.notifications`: 다운로드 시작 알림
 - `chrome.runtime.sendMessage`: 레이어 간 통신
 
+### 보안 경계
+
+- `runtime.onMessage`: content script(웹페이지)는 `setContextImageUrl`/`downloadGif`만 보낼 수 있다.
+  삭제·동기화 등 나머지는 확장 자체 페이지(팝업)에서 온 요청만 받는다 (`isFromExtensionPage`).
+- `resolveOrphans`는 마지막 동기화가 보여준 경로(`storage.session.lastOrphanPaths`)만 처리한다. `.`/`..` 경로는 거부.
+- 도우미는 실제 경로가 `~/Downloads/jjal-tok`인 폴더 바로 아래 파일만 다룬다 (심볼릭 링크 해제 후 비교).
+- `install.sh`는 한 줄 설치 시 `RELEASE_TAG`의 소스를 받아 `SOURCE_SHA256` 일치할 때만 빌드한다.
+  → `JjalTokHelper.swift`를 고치면 릴리스 전에 두 값을 함께 갱신해야 한다.
+
 ### Firefox vs Chrome 차이점
 
 - 두 브라우저 모두 `downloads.removeFile()`을 지원한다 (실제 파일 삭제).
-- `chrome/`와 `firefox/`의 `src/*.js`, `popup/popup.js`는 동일한 코드 (`globalThis.browser ?? chrome`).
+- `chrome/`와 `firefox/`의 `src/*.js`, `popup/*`은 동일한 코드 (`globalThis.browser ?? chrome`). 한쪽을 고치면 그대로 복사.
+- 저장 폴더: Firefox/Zen은 `jjal-tok`, Chrome은 `jjal-tok-chrome` (확장 주소 스킴으로 구분 — 최근 Chrome도
+  `globalThis.browser`가 있어서 브라우저 판별에 쓰면 안 된다). 목록(storage)은 원래 브라우저마다 따로다.
+- 도우미는 macOS + nativeMessaging 권한이 있는 빌드(Firefox/Zen)에서만 쓴다 (`helperSupported`).
+  Chrome은 다운로드 기록이 유지되어 도우미 없이 모든 기능이 동작한다.
+- Chrome은 "다운로드 전에 저장 위치 확인" 설정이 켜져 있으면 `saveAs: false`여도 저장 창이 뜬다 (확장으로 못 바꿈).
 
 ## 파일별 역할
 

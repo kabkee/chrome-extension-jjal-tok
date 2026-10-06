@@ -9,7 +9,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const openFolderBtn = document.getElementById('openFolderBtn');
   if (openFolderBtn) {
     openFolderBtn.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ action: 'openDownloadsFolder' });
+      chrome.runtime.sendMessage({ action: 'openDownloadsFolder' }, (response) => {
+        // 브라우저 API로는 하위 폴더를 직접 못 열어서, 폴더 안 파일이 하나도 없으면 다운로드 폴더가 열린다
+        if (response && response.opened === 'default') {
+          showSyncPanel(`<p>아직 이 브라우저로 저장한 GIF가 없어서 다운로드 폴더를 열었어요. GIF를 저장하면 그 뒤로는 <code>${escapeHtml(response.folder)}</code> 폴더가 열려요.</p>`);
+        }
+      });
     });
   }
 
@@ -202,9 +207,13 @@ function syncWithFolder(syncBtn) {
     }
 
     const lines = [];
-    lines.push(response.removed > 0
-      ? `<p>🗑 폴더에서 사라진 파일 ${response.removed}개를 목록에서 뺐어요.</p>`
-      : '<p>✅ 목록의 파일이 모두 폴더에 있어요.</p>');
+    if (response.removed > 0) {
+      lines.push(`<p>🗑 폴더에서 사라진 파일 ${response.removed}개를 목록에서 뺐어요.</p>`);
+    } else if (response.listCount === 0) {
+      lines.push('<p>목록이 비어 있어요. 이 브라우저에서 GIF를 저장하면 여기에 쌓여요. (목록은 브라우저마다 따로 관리돼요)</p>');
+    } else {
+      lines.push('<p>✅ 목록의 파일이 모두 폴더에 있어요.</p>');
+    }
 
     if (response.droppedUnknown > 0) {
       lines.push(`<p>🧹 원본 주소를 알 수 없는 항목 ${response.droppedUnknown}개를 파일과 함께 정리했어요.</p>`);

@@ -1,7 +1,9 @@
 // Firefox는 browser.*(Promise), Chrome MV3는 chrome.*(Promise)를 쓴다.
 const api = globalThis.browser ?? chrome;
 
-const FOLDER = 'jjal-tok';
+// 저장 폴더 (다운로드 폴더 아래). 브라우저별로 나눠서 Chrome과 Firefox/Zen 목록·파일이 섞이지 않게 한다.
+// ※ globalThis.browser는 최근 Chrome에도 있어 판별에 못 쓴다 → 확장 주소의 스킴으로 구분
+const FOLDER = api.runtime.getURL('').startsWith('chrome-extension://') ? 'jjal-tok-chrome' : 'jjal-tok';
 const MAX_GIFS = 20;
 // 파일이 "지금" 있는지 알려주는 Native Messaging 도우미 (native-host/install.sh로 설치, 선택 사항)
 const NATIVE_HOST = 'jjaltok_host';
@@ -82,6 +84,19 @@ async function callNative(action, payload = {}) {
     lastNativeError = 'missing';
   }
   return null;
+}
+
+// 도우미를 쓸 수 있는 환경인지: nativeMessaging 권한이 있는 빌드(Firefox/Zen) + macOS (도우미가 macOS 전용)
+// ※ 최근 Chrome도 globalThis.browser를 지원하므로 브라우저 판별에 쓰면 안 된다.
+async function helperSupported() {
+  const permissions = api.runtime.getManifest().permissions || [];
+  if (!permissions.includes('nativeMessaging')) return false;
+  try {
+    const { os } = await api.runtime.getPlatformInfo();
+    return os === 'mac';
+  } catch (error) {
+    return false;
+  }
 }
 
 function dirname(path) {
@@ -165,7 +180,8 @@ async function findDownloadById(downloadId) {
 }
 
 function isInJjalTokFolder(path) {
-  return new RegExp(FOLDER_FILE_REGEX, 'i').test(path || '');
+  if (typeof path !== 'string' || /(^|[\\/])\.\.?([\\/]|$)/.test(path)) return false; // . / .. 경로 거부
+  return new RegExp(FOLDER_FILE_REGEX, 'i').test(path);
 }
 
 async function revealDownload(downloadId) {
@@ -321,6 +337,10 @@ async function applyDownloadState(item) {
   await updateGifs(list => {
     const gif = list.find(g => g.downloadId === item.id && g.status === 'downloading');
     if (!gif) return list;
+    // 저장 창에서 사용자가 취소한 경우: '실패'로 남기지 않고 목록에서 뺀다
+    if (status === 'failed' && item.error === 'USER_CANCELED') {
+      return list.filter(g => g !== gif);
+    }
     gif.status = status;
     if (status === 'complete') {
       gif.filePath = item.filename;
@@ -497,17 +517,41 @@ async function syncWithFolder() {
     seen.add(key);
     orphans.push({ filePath, filename: basename(filePath), url: urlByPath.get(key) ?? null });
   }
+  await rememberOrphans(orphans.map(o => o.filePath));
 
-  // Firefox인데 폴더를 못 읽었으면 팝업에서 이유별로 안내 (도우미 미설치 / macOS 권한)
-  const isFirefox = typeof globalThis.browser !== 'undefined';
-  const nativeProblem = !listing && isFirefox ? (lastNativeError || 'missing') : null;
-  return { success: true, removed, unverified, orphans, droppedUnknown, nativeProblem };
+  // 도우미를 쓸 수 있는 환경인데 폴더를 못 읽었으면 팝업에서 이유별로 안내 (도우미 미설치 / macOS 권한)
+  const nativeProblem = !listing && await helperSupported() ? (lastNativeError || 'missing') : null;
+  return { success: true, removed, unverified, orphans, droppedUnknown, nativeProblem, listCount: next.length, folder: FOLDER };
 }
 
 // 목록에 없는 파일들 처리: mode = 'delete' | 'adopt'
+// 마지막 동기화가 "목록에 없는 파일"로 보여준 경로만 삭제/추가할 수 있게 기억해 둔다.
+// (요청에 담긴 임의 경로를 그대로 믿지 않기 위해. 백그라운드가 잠들었다 깨도 남도록 storage.session 사용)
+let lastOrphanPaths = [];
+
+async function rememberOrphans(paths) {
+  lastOrphanPaths = paths;
+  try {
+    await api.storage.session.set({ lastOrphanPaths: paths });
+  } catch (error) {
+    // storage.session이 없는 오래된 브라우저 → 메모리 값만 사용
+  }
+}
+
+async function getRememberedOrphans() {
+  try {
+    const { lastOrphanPaths: saved } = await api.storage.session.get('lastOrphanPaths');
+    if (Array.isArray(saved)) return saved;
+  } catch (error) {
+    // 메모리 값 사용
+  }
+  return lastOrphanPaths;
+}
+
 async function resolveOrphans(filePaths, mode) {
   let count = 0;
-  const targets = filePaths.filter(isInJjalTokFolder);
+  const allowed = new Set(await getRememberedOrphans());
+  const targets = filePaths.filter(path => allowed.has(path) && isInJjalTokFolder(path));
 
   if (mode === 'delete') {
     for (const filePath of targets) {
@@ -630,12 +674,25 @@ async function openJjalTokFolder() {
   }
 
   api.downloads.showDefaultFolder();
-  return { success: true, opened: 'default' };
+  return { success: true, opened: 'default', folder: FOLDER };
+}
+
+// 웹페이지에 주입된 content script가 보낼 수 있는 요청은 GIF 저장 관련뿐이다.
+// 파일 삭제·동기화 같은 나머지는 확장 프로그램 자체 페이지(팝업)에서 온 요청만 받는다.
+const CONTENT_SCRIPT_ACTIONS = new Set(['setContextImageUrl', 'downloadGif']);
+
+function isFromExtensionPage(sender) {
+  return sender.id === api.runtime.id && !sender.tab &&
+    typeof sender.url === 'string' && sender.url.startsWith(api.runtime.getURL(''));
 }
 
 api.runtime.onMessage.addListener((request, sender, sendResponse) => {
   const handler = handlers[request.action];
-  if (!handler) return false;
+  if (!handler || sender.id !== api.runtime.id) return false;
+  if (!CONTENT_SCRIPT_ACTIONS.has(request.action) && !isFromExtensionPage(sender)) {
+    console.warn('허용되지 않은 요청 무시:', request.action, sender.url);
+    return false;
+  }
 
   Promise.resolve()
     .then(() => handler(request))

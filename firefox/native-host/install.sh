@@ -5,8 +5,10 @@
 #   ./install.sh uninstall  제거
 #
 # 소스를 받지 않고 한 줄로 설치 (도우미 소스는 GitHub에서 받아 이 Mac에서 빌드):
-#   curl -fsSL https://raw.githubusercontent.com/kabkee/chrome-extension-jjal-tok/main/firefox/native-host/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/kabkee/chrome-extension-jjal-tok/v1.2.6/firefox/native-host/install.sh | bash
 #   (제거: 위 명령 끝에 `-s uninstall`)
+# 받는 소스는 아래 RELEASE_TAG로 고정되고, SOURCE_SHA256과 일치할 때만 빌드한다.
+# ※ JjalTokHelper.swift를 고치면 릴리스 전에 SOURCE_SHA256과 RELEASE_TAG를 함께 갱신할 것.
 #
 # 설치 위치
 #   도우미 앱:     ~/Library/Application Support/JjalTok/JjalTok Helper.app
@@ -21,7 +23,9 @@ HOST_NAME="jjaltok_host"
 EXTENSION_ID="jjaltok@kabkee.dev"
 BUNDLE_ID="dev.kabkee.jjaltok.helper"
 APP_NAME="JjalTok Helper"
-REPO_RAW="https://raw.githubusercontent.com/kabkee/chrome-extension-jjal-tok/${JJALTOK_REF:-main}/firefox/native-host"
+RELEASE_TAG="v1.2.6"
+SOURCE_SHA256="7e5aa4609fed741a03c436cd7b045590188bdf1d245d35f3b6b6bece9a54189f"
+REPO_RAW="https://raw.githubusercontent.com/kabkee/chrome-extension-jjal-tok/$RELEASE_TAG/firefox/native-host"
 # curl | bash 로 실행되면 $0이 "bash"라서 스크립트 폴더가 없다 → 그때는 소스를 GitHub에서 받는다
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || pwd)"
 APP_DIR="$HOME/Library/Application Support/JjalTok"
@@ -60,6 +64,14 @@ if [[ ! -f "$SOURCE" ]]; then
   echo "⬇️  도우미 소스 받는 중..."
   SOURCE="$BUILD_DIR/JjalTokHelper.swift"
   curl -fsSL "$REPO_RAW/JjalTokHelper.swift" -o "$SOURCE"
+  # 받은 소스가 이 스크립트가 기대하는 것과 같은지 확인 (다르면 다운로드 폴더 권한을 받을 앱을 만들지 않는다)
+  ACTUAL_SHA256="$(shasum -a 256 "$SOURCE" | cut -d' ' -f1)"
+  if [[ "$ACTUAL_SHA256" != "$SOURCE_SHA256" ]]; then
+    echo "❌ 받은 도우미 소스의 해시가 다릅니다. 설치를 중단합니다." >&2
+    echo "   기대: $SOURCE_SHA256" >&2
+    echo "   실제: $ACTUAL_SHA256" >&2
+    exit 1
+  fi
 fi
 echo "🔨 도우미 앱 빌드 중..."
 swiftc -O -o "$BUILD_DIR/JjalTokHelper" "$SOURCE"
@@ -79,8 +91,8 @@ cat > "$APP_PATH/Contents/Info.plist" <<PLIST
   <key>CFBundleDisplayName</key><string>$APP_NAME</string>
   <key>CFBundleExecutable</key><string>JjalTokHelper</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>5</string>
-  <key>CFBundleVersion</key><string>5</string>
+  <key>CFBundleShortVersionString</key><string>6</string>
+  <key>CFBundleVersion</key><string>6</string>
   <key>LSUIElement</key><true/>
   <key>NSDownloadsFolderUsageDescription</key>
   <string>짤톡이 다운로드/jjal-tok 폴더의 GIF 목록을 확인하고, 짤톡에서 삭제한 파일을 지우기 위해 필요합니다.</string>

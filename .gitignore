@@ -5,3 +5,7 @@ node_modules/
 .idea/
 dist/
 *.zip
+
+# web-ext sign 상태 파일, 테스트 스크린샷
+.amo-upload-uuid
+.playwright-mcp/
