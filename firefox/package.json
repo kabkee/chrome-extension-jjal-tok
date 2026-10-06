@@ -4,7 +4,9 @@
   "description": "GIF 이미지를 임시 저장소에 다운로드하여 카카오톡으로 빠르게 전송하는 Chrome 확장 프로그램",
   "main": "src/background.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "web-ext build --overwrite-dest --filename \"jjaltok-{version}.xpi\" --ignore-files \"native-host/**\" \"web-ext-artifacts/**\" \".claude/**\" \".DS_Store\" CLAUDE.md package.json create-icons.html generate-icons.js \"icons/generate-icons.html\" \"icons/README.md\"",
+    "lint": "web-ext lint --self-hosted --ignore-files \"native-host/**\" \"web-ext-artifacts/**\" \".claude/**\" \".DS_Store\" CLAUDE.md package.json create-icons.html generate-icons.js \"icons/generate-icons.html\" \"icons/README.md\"",
+    "sign": "web-ext sign --channel unlisted --artifacts-dir web-ext-artifacts --ignore-files \"native-host/**\" \"web-ext-artifacts/**\" \".claude/**\" \".DS_Store\" CLAUDE.md package.json create-icons.html generate-icons.js \"icons/generate-icons.html\" \"icons/README.md\""
   },
   "keywords": [
     "chrome-extension",
