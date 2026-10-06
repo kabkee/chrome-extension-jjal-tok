@@ -9,7 +9,7 @@
 <body>
   <div class="container">
     <header>
-      <h1>💬 짤톡</h1>
+      <h1>💬 짤톡 <span id="version" class="version"></span></h1>
       <p class="subtitle">GIF를 다운로드 폴더에 저장합니다</p>
     </header>
     
@@ -21,7 +21,10 @@
         <li>파일을 카카오톡 채팅창으로 드래그하여 전송!</li>
       </ol>
       <button id="openFolderBtn" class="folder-btn">📁 다운로드 폴더 열기</button>
+      <button id="syncBtn" class="folder-btn" title="폴더의 실제 파일과 목록을 맞춥니다">🔄 동기화</button>
     </div>
+
+    <div id="syncPanel" class="sync-panel" hidden></div>
     
     <div id="gifList" class="gif-list">
       <div class="empty-state">

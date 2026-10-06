@@ -66,23 +66,44 @@ GIF 이미지를 더블클릭하여 `다운로드/jjal-tok/` 폴더에 자동 �
    - background.js: 다운로드 ID 생성 → Storage에 GIF 정보 저장
    - background.js: `chrome.downloads.onChanged` 리스너로 상태 업데이트 (downloading → complete/failed)
 
-2. **Storage 구조**:
+2. **Storage 구조** (`storage.local`이 유일한 원본 — background는 메모리 캐시를 두지 않음):
    ```javascript
    downloadedGifs = [
      {
-       id: downloadId,           // 고유 ID (다운로드 ID와 동일)
-       url: "https://...",        // 원본 GIF URL
-       filename: "example.gif",   // 파일명
-       timestamp: "2024-...",     // 다운로드 시각
-       downloadId: 123,           // Chrome Downloads API ID
-       status: "complete"         // downloading/complete/failed
+       id: "1760000000000-ab12cd",   // 목록 고유 ID (다운로드 ID와 무관)
+       url: "https://...",            // 원본 GIF URL (중복 판단 기준)
+       filename: "example.gif",       // 표시용 파일명
+       filePath: "/Users/.../Downloads/jjal-tok/example.gif", // 다운로드 기록을 다시 찾는 기준
+       downloadId: 123,               // 이번 세션의 다운로드 ID (재시작 시 reconcile로 갱신)
+       status: "complete",            // downloading/complete/failed
+       timestamp: "2026-..."
      }
    ]
    ```
 
-3. **최대 20개 제한**:
-   - 새 GIF가 추가될 때 `downloadedGifs.unshift()`로 맨 앞에 추가
-   - 20개 초과 시 `slice(0, 20)`으로 오래된 항목 자동 제거
+3. **최대 20개 제한**: 새 항목은 맨 앞에 추가, 20개 초과분은 목록에서 빠지면서 실제 파일도 삭제(`onGifsEvicted`).
+   '동기화 → 목록에 추가'는 빈 자리만큼만 추가한다 (넘치면 방금 추가한 파일이 지워지므로)
+
+4. **중복/동기화/삭제**:
+   - 같은 URL 재다운로드 요청 → 파일이 있으면 새로 받지 않고 맨 위로 올린 뒤 `downloads.show()`
+   - 다운로드 완료 시 자동으로 Finder에서 파일 위치 열기 (드래그 저장은 제외)
+   - 삭제 → `downloads.removeFile()` + `downloads.erase()` (실제 파일 삭제)
+   - 동기화 → `downloads.search({ filenameRegex: jjal-tok })`의 `exists`로 목록과 비교
+
+### ⚠️ Firefox 확장용 downloads API는 "이번 세션"만 본다
+
+- 데스크톱 Firefox는 완료된 다운로드를 재시작 후 API 목록에 올리지 않는다 (`DownloadIntegration.shouldPersistDownload`).
+  브라우저 '기록'(places)에는 남지만 확장 API로는 조회할 수 없다. 다운로드 ID도 세션마다 새로 매겨진다 (Bug 1247794).
+- 그래서 저장된 `downloadId`는 믿지 않고, 항상 `locateFile(gif)`로 파일 상태를 구한다.
+  - 이번 세션 파일 → `downloads.search({ filename })`로 찾고 `show()`/`removeFile()`
+  - 이전 세션 파일 → `filePath`(옛 항목은 폴더+파일명 추정)로 도우미에게 `exists`/`reveal`/`delete`
+- `item.exists`도 Finder 삭제를 바로 반영하지 않으므로 도우미가 있으면 `refreshExists()`로 덮어쓴다.
+- 도우미(`native-host/`, `./install.sh`, 선택 설치)는 jjal-tok 폴더 바로 아래 파일만 다룬다 (exists/list/delete/reveal/openFolder). xpi에는 포함되지 않는다.
+  - Swift로 만든 `JjalTok Helper.app`이다 (`JjalTokHelper.swift`를 install.sh가 빌드·로컬 서명).
+    macOS(TCC)는 브라우저가 실행한 도우미에 브라우저 권한을 물려주지 않아서, 스크립트로 만들면 python3 자체에
+    다운로드 폴더 권한을 줘야 한다. 그래서 전용 앱으로 만들어 그 앱에만 '다운로드 폴더' 권한을 받는다.
+  - 로그: `~/Library/Logs/JjalTok/host.log` (권한 오류는 `PERMISSION`으로 남음)
+  도우미가 없으면 이전 세션 항목은 '확인 불가'가 되고, 클릭 시 같은 이름으로 다시 받아(overwrite) 복구한다.
 
 ### Chrome Extension API 사용
 
@@ -94,15 +115,8 @@ GIF 이미지를 더블클릭하여 `다운로드/jjal-tok/` 폴더에 자동 �
 
 ### Firefox vs Chrome 차이점
 
-```javascript
-// Chrome: 실제 파일 삭제 지원
-if (chrome.downloads.removeFile) {
-  chrome.downloads.removeFile(downloadId, callback);
-} else {
-  // Firefox/Zen: 파일 삭제 미지원 → 이력만 삭제
-  console.log('이 브라우저는 파일 삭제를 지원하지 않습니다.');
-}
-```
+- 두 브라우저 모두 `downloads.removeFile()`을 지원한다 (실제 파일 삭제).
+- `chrome/`와 `firefox/`의 `src/*.js`, `popup/popup.js`는 동일한 코드 (`globalThis.browser ?? chrome`).
 
 ## 파일별 역할
 

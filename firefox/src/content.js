@@ -44,9 +44,11 @@ document.addEventListener('dragstart', (e) => {
 
       try {
         if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id) {
+          // 드래그 중에 Finder가 튀어나오면 드래그가 끊기므로 위치 열기는 하지 않는다.
           chrome.runtime.sendMessage({
             action: 'downloadGif',
-            url: imgUrl
+            url: imgUrl,
+            reveal: false
           });
         }
       } catch (error) {
@@ -77,8 +79,14 @@ document.addEventListener('dblclick', (e) => {
               return;
             }
             console.log('백그라운드 응답:', response);
-            if (response && response.success) {
+            if (response && response.inProgress) {
+              showNotification('저장 중인 GIF입니다. 잠시만요!');
+            } else if (response && response.duplicate) {
+              showNotification('이미 저장된 GIF예요. 파일 위치를 엽니다!');
+            } else if (response && response.success) {
               showNotification('GIF가 짤톡에 저장되었습니다!');
+            } else if (response) {
+              showNotification('⚠️ GIF 저장에 실패했습니다.');
             }
           });
         } else {

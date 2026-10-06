@@ -9,12 +9,15 @@
 <body>
   <div class="container">
     <header>
-      <h1>💬 짤톡</h1>
+      <h1>💬 짤톡 <span id="version" class="version"></span></h1>
       <div class="header-actions">
         <button id="helpBtn" class="help-btn" title="사용법 보기">❓</button>
         <button id="openFolderBtn" class="folder-btn">📁 폴더 열기</button>
+        <button id="syncBtn" class="folder-btn" title="폴더의 실제 파일과 목록을 맞춥니다">🔄 동기화</button>
       </div>
     </header>
+
+    <div id="syncPanel" class="sync-panel" hidden></div>
 
     <div id="gifList" class="gif-list">
       <div class="empty-state">
@@ -36,6 +39,9 @@
           <li><strong>GIF 저장하기:</strong><br>웹페이지에서 GIF를 더블클릭하거나 우클릭 → "짤톡에 저장"</li>
           <li><strong>저장된 GIF 확인:</strong><br>팝업에서 썸네일을 클릭하면 파일 위치가 열립니다</li>
           <li><strong>카카오톡으로 전송:</strong><br>파일을 카카오톡 채팅창으로 드래그하여 전송!</li>
+          <li><strong>같은 GIF 다시 더블클릭:</strong><br>새로 받지 않고 목록 맨 위로 올린 뒤 파일 위치를 엽니다</li>
+          <li><strong>삭제:</strong><br>목록과 함께 실제 파일도 삭제됩니다</li>
+          <li><strong>동기화:</strong><br>Finder에서 지운 파일을 목록에서 빼고, 목록에 없는 파일을 찾아 정리합니다</li>
         </ol>
         <p class="tip">💡 <strong>Tip:</strong> 최대 20개의 GIF가 자동으로 관리됩니다</p>
       </div>

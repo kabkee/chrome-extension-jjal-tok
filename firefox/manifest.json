@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "짤톡 - GIF to KakaoTalk",
-  "version": "1.1.1",
+  "version": "1.2.4",
   "description": "GIF 이미지를 임시 저장소에 다운로드하여 카카오톡으로 빠르게 전송하는 Firefox/Zen 확장 프로그램",
   "permissions": [
     "downloads",
@@ -9,7 +9,8 @@
     "activeTab",
     "contextMenus",
     "notifications",
-    "tabs"
+    "tabs",
+    "nativeMessaging"
   ],
   "host_permissions": [
     "<all_urls>"

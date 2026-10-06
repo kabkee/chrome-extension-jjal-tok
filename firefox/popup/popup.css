@@ -319,3 +319,76 @@ header h1 {
 .modal-body .tip strong {
   color: #e17055;
 }
+
+.sync-panel {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  padding: 12px 15px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #333;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.sync-panel[hidden] {
+  display: none;
+}
+
+.sync-panel p + p,
+.sync-panel ul {
+  margin-top: 6px;
+}
+
+.sync-panel ul {
+  padding-left: 18px;
+  max-height: 120px;
+  overflow-y: auto;
+  font-size: 12px;
+  color: #666;
+  word-break: break-all;
+}
+
+.sync-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.sync-actions button {
+  flex: 1;
+  border: none;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  background: #667eea;
+  color: white;
+}
+
+.sync-actions button.danger {
+  background: #e74c3c;
+}
+
+.sync-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.sync-hint {
+  font-size: 11px;
+  color: #888;
+}
+
+.sync-hint code {
+  background: #f0f0f0;
+  border-radius: 3px;
+  padding: 0 3px;
+}
+
+.version {
+  font-size: 12px;
+  font-weight: normal;
+  opacity: 0.8;
+  vertical-align: middle;
+}
