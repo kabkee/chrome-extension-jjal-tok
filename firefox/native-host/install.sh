@@ -4,6 +4,10 @@
 #   ./install.sh            설치 (도우미 앱 빌드 → 브라우저 등록 → 다운로드 폴더 권한 요청)
 #   ./install.sh uninstall  제거
 #
+# 소스를 받지 않고 한 줄로 설치 (도우미 소스는 GitHub에서 받아 이 Mac에서 빌드):
+#   curl -fsSL https://raw.githubusercontent.com/kabkee/chrome-extension-jjal-tok/main/firefox/native-host/install.sh | bash
+#   (제거: 위 명령 끝에 `-s uninstall`)
+#
 # 설치 위치
 #   도우미 앱:     ~/Library/Application Support/JjalTok/JjalTok Helper.app
 #   브라우저 등록: ~/Library/Application Support/Mozilla/NativeMessagingHosts/jjaltok_host.json
@@ -17,7 +21,9 @@ HOST_NAME="jjaltok_host"
 EXTENSION_ID="jjaltok@kabkee.dev"
 BUNDLE_ID="dev.kabkee.jjaltok.helper"
 APP_NAME="JjalTok Helper"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_RAW="https://raw.githubusercontent.com/kabkee/chrome-extension-jjal-tok/${JJALTOK_REF:-main}/firefox/native-host"
+# curl | bash 로 실행되면 $0이 "bash"라서 스크립트 폴더가 없다 → 그때는 소스를 GitHub에서 받는다
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || pwd)"
 APP_DIR="$HOME/Library/Application Support/JjalTok"
 APP_PATH="$APP_DIR/$APP_NAME.app"
 EXEC_PATH="$APP_PATH/Contents/MacOS/JjalTokHelper"
@@ -39,16 +45,24 @@ if [[ "$(uname)" != "Darwin" ]]; then
   exit 1
 fi
 
-if ! command -v swiftc >/dev/null 2>&1; then
-  echo "❌ swiftc가 없습니다. 터미널에서 'xcode-select --install' 로 Command Line Tools를 설치한 뒤 다시 실행하세요." >&2
+# /usr/bin/swiftc는 Command Line Tools가 없어도 존재하는 껍데기라서 xcrun으로 실제 설치 여부를 확인한다
+if ! xcrun --find swiftc >/dev/null 2>&1; then
+  echo "❌ 도우미를 빌드하려면 Xcode Command Line Tools가 필요합니다."
+  echo "   터미널에서 'xcode-select --install' 을 실행해 설치한 뒤, 이 명령을 다시 실행하세요." >&2
   exit 1
 fi
 
 # 1) 도우미 앱 빌드
 BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT
+SOURCE="$SCRIPT_DIR/JjalTokHelper.swift"
+if [[ ! -f "$SOURCE" ]]; then
+  echo "⬇️  도우미 소스 받는 중..."
+  SOURCE="$BUILD_DIR/JjalTokHelper.swift"
+  curl -fsSL "$REPO_RAW/JjalTokHelper.swift" -o "$SOURCE"
+fi
 echo "🔨 도우미 앱 빌드 중..."
-swiftc -O -o "$BUILD_DIR/JjalTokHelper" "$SCRIPT_DIR/JjalTokHelper.swift"
+swiftc -O -o "$BUILD_DIR/JjalTokHelper" "$SOURCE"
 
 mkdir -p "$APP_DIR" "$MANIFEST_DIR"
 rm -rf "$APP_PATH" "$APP_DIR/$HOST_NAME.py"   # 이전 버전(python 스크립트) 정리
@@ -104,8 +118,17 @@ fi
 
 # 4) 다운로드 폴더 권한 요청: 앱을 단독으로 실행해 macOS 권한 창을 띄운다.
 echo "🔐 macOS가 'JjalTok Helper가 다운로드 폴더에 접근하려고 합니다' 창을 띄우면 [허용]을 눌러주세요."
-open -W "$APP_PATH" --args --request-access
-RESULT="$(grep 'request-access' "$LOG_PATH" 2>/dev/null | tail -1 || true)"
+BEFORE="$(grep -c 'request-access' "$LOG_PATH" 2>/dev/null || true)"
+open -W "$APP_PATH" --args --request-access 2>/dev/null || true
+# 앱이 너무 빨리 끝나면 open -W가 기다리지 못하므로, 결과가 로그에 남을 때까지 기다린다 (권한 창 응답 포함 최대 60초)
+RESULT=""
+for _ in $(seq 1 120); do
+  if [[ "$(grep -c 'request-access' "$LOG_PATH" 2>/dev/null || true)" != "${BEFORE:-0}" ]]; then
+    RESULT="$(grep 'request-access' "$LOG_PATH" | tail -1)"
+    break
+  fi
+  sleep 0.5
+done
 
 echo "✅ 짤톡 도우미 설치 완료"
 echo "   도우미 앱: $APP_PATH"
